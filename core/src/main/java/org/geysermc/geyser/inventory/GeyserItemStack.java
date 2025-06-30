@@ -72,7 +72,7 @@ public class GeyserItemStack {
     private Item item;
 
     private GeyserItemStack(GeyserSession session, int javaId, int amount, DataComponents components) {
-        this(session.getComponentCache(), javaId, amount, components, 1, null);
+        this(session == null ? null : session.getComponentCache(), javaId, amount, components, 1, null);
     }
 
     private GeyserItemStack(ComponentCache componentCache, int javaId, int amount, DataComponents components, int netId, BundleCache.BundleData bundleData) {

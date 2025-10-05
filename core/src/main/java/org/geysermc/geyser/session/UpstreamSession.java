@@ -58,7 +58,7 @@ public class UpstreamSession {
     }
 
     public void disconnect(String reason) {
-        session.disconnect(reason);
+        this.session.disconnect(reason);
     }
 
     /**
@@ -105,5 +105,9 @@ public class UpstreamSession {
      */
     public BedrockCodecHelper getCodecHelper() {
         return this.session.getPeer().getCodecHelper();
+    }
+
+    public void forciblyClose() {
+        this.session.getPeer().getChannel().close();
     }
 }

@@ -25,30 +25,31 @@
 
 package org.geysermc.geyser.translator.protocol.java;
 
-import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundLoginPacket;
-import com.github.steveice10.mc.protocol.packet.ingame.serverbound.ServerboundCustomPayloadPacket;
-import com.github.steveice10.opennbt.tag.builtin.CompoundTag;
-import com.github.steveice10.opennbt.tag.builtin.IntTag;
+import net.kyori.adventure.key.Key;
 import org.cloudburstmc.protocol.bedrock.data.GameRuleData;
 import org.cloudburstmc.protocol.bedrock.packet.GameRulesChangedPacket;
 import org.cloudburstmc.protocol.bedrock.packet.SetPlayerGameTypePacket;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import org.geysermc.erosion.Constants;
 import org.geysermc.floodgate.pluginmessage.PluginMessageChannels;
 import org.geysermc.geyser.api.network.AuthType;
 import org.geysermc.geyser.entity.type.player.SessionPlayerEntity;
-import org.geysermc.geyser.erosion.GeyserboundHandshakePacketHandler;
+import org.geysermc.geyser.level.BedrockDimension;
 import org.geysermc.geyser.level.JavaDimension;
 import org.geysermc.geyser.session.GeyserSession;
-import org.geysermc.geyser.text.TextDecoration;
-import org.geysermc.geyser.translator.level.BiomeTranslator;
+import org.geysermc.geyser.session.cache.registry.JavaRegistries;
 import org.geysermc.geyser.translator.protocol.PacketTranslator;
 import org.geysermc.geyser.translator.protocol.Translator;
 import org.geysermc.geyser.util.ChunkUtils;
 import org.geysermc.geyser.util.DimensionUtils;
-import org.geysermc.geyser.util.JavaCodecUtil;
-import org.geysermc.geyser.util.PluginMessageUtils;
+import org.geysermc.geyser.util.EntityUtils;
+import org.geysermc.geyser.util.MinecraftKey;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.player.PlayerSpawnInfo;
+import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.ServerboundCustomPayloadPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundLoginPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.ServerboundPlayerLoadedPacket;
 
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 @Translator(packet = ClientboundLoginPacket.class)
 public class JavaLoginTranslator extends PacketTranslator<ClientboundLoginPacket> {
@@ -58,66 +59,55 @@ public class JavaLoginTranslator extends PacketTranslator<ClientboundLoginPacket
         SessionPlayerEntity entity = session.getPlayerEntity();
         entity.setEntityId(packet.getEntityId());
 
-        if (session.getErosionHandler().isActive()) {
-            session.getErosionHandler().close();
-            session.setErosionHandler(new GeyserboundHandshakePacketHandler(session));
-        }
-
-        Map<String, JavaDimension> dimensions = session.getDimensions();
-        dimensions.clear();
-
-        JavaDimension.load(packet.getRegistry(), dimensions);
-
-        Int2ObjectMap<TextDecoration> chatTypes = session.getChatTypes();
-        chatTypes.clear();
-        for (CompoundTag tag : JavaCodecUtil.iterateAsTag(packet.getRegistry().get("minecraft:chat_type"))) {
-            // The ID is NOT ALWAYS THE SAME! ViaVersion as of 1.19 adds two registry entries that do NOT match vanilla.
-            int id = ((IntTag) tag.get("id")).getValue();
-            CompoundTag element = tag.get("element");
-            CompoundTag chat = element.get("chat");
-            TextDecoration textDecoration = null;
-            if (chat != null) {
-                textDecoration = new TextDecoration(chat);
-            }
-            chatTypes.put(id, textDecoration);
-        }
+        PlayerSpawnInfo spawnInfo = packet.getCommonPlayerSpawnInfo();
+        JavaDimension newDimension = session.getRegistryCache().registry(JavaRegistries.DIMENSION_TYPE).byId(spawnInfo.getDimension());
 
         // If the player is already initialized and a join game packet is sent, they
         // are swapping servers
         if (session.isSpawned()) {
-            String fakeDim = DimensionUtils.getTemporaryDimension(session.getDimension(), packet.getDimension());
-            DimensionUtils.switchDimension(session, fakeDim);
+            int fakeDim = DimensionUtils.getTemporaryDimension(session.getBedrockDimension().bedrockId(), newDimension.bedrockId());
+            if (fakeDim != newDimension.bedrockId()) {
+                // The player's current dimension and new dimension are the same
+                // We want a dimension switch to clear old chunks out, so switch to a dimension that isn't the one we're currently in.
+                // Another dimension switch will be required to switch back
+                DimensionUtils.fastSwitchDimension(session, fakeDim);
+            }
 
-            session.getWorldCache().removeScoreboard();
+            // Remove all bossbars
+            session.getEntityCache().removeAllBossBars();
+            // Remove extra hearts, hunger, etc.
+            entity.resetAttributes();
+            entity.resetMetadata();
+
+            // Reset inventories; just in case. Might resolve some issues where inventories get stuck?
+            session.setInventoryHolder(null);
+            session.setPendingOrCurrentBedrockInventoryId(-1);
+            session.setClosingInventory(false);
+
+            // Clear waypoints
+            session.getWaypointCache().clear();
         }
-        session.setWorldName(packet.getWorldName());
-        session.setLevels(packet.getWorldNames());
 
-        BiomeTranslator.loadServerBiomes(session, packet.getRegistry());
-        session.getTagCache().clear();
-
-        session.setGameMode(packet.getGameMode());
-
-        String newDimension = packet.getDimension();
+        session.setDimensionType(newDimension);
+        session.setWorldName(spawnInfo.getWorldName());
+        session.setLevels(Arrays.stream(packet.getWorldNames()).map(Key::asString).toArray(String[]::new));
+        session.setGameMode(spawnInfo.getGameMode());
 
         boolean needsSpawnPacket = !session.isSentSpawnPacket();
         if (needsSpawnPacket) {
             // The player has yet to spawn so let's do that using some of the information in this Java packet
-            session.setDimension(newDimension);
-            DimensionUtils.setBedrockDimension(session, newDimension);
+            DimensionUtils.setBedrockDimension(session, newDimension.bedrockId());
             session.connect();
 
             // It is now safe to send these packets
             session.getUpstream().sendPostStartGamePackets();
-        }
-
-        if (!needsSpawnPacket) {
+        } else {
             SetPlayerGameTypePacket playerGameTypePacket = new SetPlayerGameTypePacket();
-            playerGameTypePacket.setGamemode(packet.getGameMode().ordinal());
+            playerGameTypePacket.setGamemode(EntityUtils.toBedrockGamemode(spawnInfo.getGameMode()).ordinal());
             session.sendUpstreamPacket(playerGameTypePacket);
         }
 
-        entity.setLastDeathPosition(packet.getLastDeathPos());
+        entity.setLastDeathPosition(spawnInfo.getLastDeathPos());
 
         entity.updateBedrockMetadata();
 
@@ -130,27 +120,27 @@ public class JavaLoginTranslator extends PacketTranslator<ClientboundLoginPacket
 
         session.setServerRenderDistance(packet.getViewDistance());
 
-        // TODO customize
+        // send this again now that we know the server render distance
+        // as the bedrock client isn't required to send a render distance
         session.sendJavaClientSettings();
 
-        session.sendDownstreamPacket(new ServerboundCustomPayloadPacket("minecraft:brand", PluginMessageUtils.getGeyserBrandData()));
-
-        // TODO don't send two packets
-//        if (true) {
-//            session.sendDownstreamPacket(new ServerboundCustomPayloadPacket("minecraft:register", Constants.PLUGIN_MESSAGE.getBytes(StandardCharsets.UTF_8)));
-//        }
-        // register the plugin messaging channels used in Floodgate
+        Key register = MinecraftKey.key("register");
         if (session.remoteServer().authType() == AuthType.FLOODGATE) {
-            session.sendDownstreamPacket(new ServerboundCustomPayloadPacket("minecraft:register", PluginMessageChannels.getFloodgateRegisterData()));
+            session.sendDownstreamPacket(new ServerboundCustomPayloadPacket(register, PluginMessageChannels.getFloodgateRegisterData()));
         }
+        session.sendDownstreamPacket(new ServerboundCustomPayloadPacket(register, Constants.PLUGIN_MESSAGE.getBytes(StandardCharsets.UTF_8)));
 
-        if (!newDimension.equals(session.getDimension())) {
+        if (session.getBedrockDimension().bedrockId() != newDimension.bedrockId()) {
             DimensionUtils.switchDimension(session, newDimension);
-        } else if (DimensionUtils.isCustomBedrockNetherId() && newDimension.equalsIgnoreCase(DimensionUtils.NETHER)) {
+        } else if (BedrockDimension.isCustomBedrockNetherId() && newDimension.isNetherLike()) {
             // If the player is spawning into the "fake" nether, send them some fog
-            session.sendFog(DimensionUtils.BEDROCK_FOG_HELL);
+            session.camera().sendFog(DimensionUtils.BEDROCK_FOG_HELL);
         }
 
         ChunkUtils.loadDimension(session);
+
+        if (!needsSpawnPacket) {
+            session.sendDownstreamGamePacket(ServerboundPlayerLoadedPacket.INSTANCE);
+        }
     }
 }

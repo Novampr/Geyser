@@ -25,7 +25,7 @@
 
 package org.geysermc.geyser.translator.protocol.java.level;
 
-import com.github.steveice10.mc.protocol.packet.ingame.clientbound.level.ClientboundSetTimePacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.level.ClientboundSetTimePacket;
 import org.cloudburstmc.protocol.bedrock.packet.SetTimePacket;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.translator.protocol.PacketTranslator;
@@ -36,23 +36,21 @@ public class JavaSetTimeTranslator extends PacketTranslator<ClientboundSetTimePa
 
     @Override
     public void translate(GeyserSession session, ClientboundSetTimePacket packet) {
-        // Bedrock sends a GameRulesChangedPacket if there is no daylight cycle
-        // Java just sends a negative long if there is no daylight cycle
-        long time = packet.getTime();
+        session.setWorldTicks(packet.getGameTime());
 
-        // https://minecraft.gamepedia.com/Day-night_cycle#24-hour_Minecraft_day
+        long time = packet.getDayTime();
+
+        // https://minecraft.wiki/w/Day-night_cycle#24-hour_Minecraft_day
         SetTimePacket setTimePacket = new SetTimePacket();
         // We use modulus to prevent an integer overflow
         // 24000 is the range of ticks that a Minecraft day can be; we times by 8 so all moon phases are visible
         // (Last verified behavior: Bedrock 1.18.12 / Java 1.18.2)
         setTimePacket.setTime((int) (Math.abs(time) % (24000 * 8)));
         session.sendUpstreamPacket(setTimePacket);
-        if (!session.isDaylightCycle() && time >= 0) {
-            // Client thinks there is no daylight cycle but there is
-            session.setDaylightCycle(true);
-        } else if (session.isDaylightCycle() && time < 0) {
-            // Client thinks there is daylight cycle but there isn't
-            session.setDaylightCycle(false);
+
+        // We need to send a gamerule if this changed
+        if (session.isDaylightCycle() != packet.isTickDayTime()) {
+            session.setDaylightCycle(packet.isTickDayTime());
         }
     }
 }

@@ -78,11 +78,12 @@ public class PreferencesCache {
     }
 
     /**
-     * Tell the client to hide or show the coordinates. The client's preference will be overridden if either of the
-     * following are true:
-     * <br><br>
-     * {@link GeyserSession#isReducedDebugInfo} is enabled.<br>
-     * {@link GeyserConfiguration#isShowCoordinates()} is disabled.
+     * Tell the client to hide or show the coordinates.
+     * <p>
+     * If {@link #prefersShowCoordinates} is true, coordinates will be shown, unless either of the following conditions apply: <br>
+     * <br>
+     * {@link GeyserSession#isReducedDebugInfo()} is enabled
+     * {@link GeyserConfiguration#isShowCoordinates()} is disabled
      */
     public void updateShowCoordinates() {
         Preference<Boolean> preference = require(ShowCoordinatesPreference.KEY);

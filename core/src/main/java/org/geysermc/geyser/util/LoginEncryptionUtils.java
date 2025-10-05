@@ -28,20 +28,20 @@ package org.geysermc.geyser.util;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.steveice10.mc.auth.service.MsaAuthenticationService;
+import net.raphimc.minecraftauth.step.msa.StepMsaDeviceCode;
+import org.cloudburstmc.protocol.bedrock.data.auth.AuthPayload;
+import org.cloudburstmc.protocol.bedrock.data.auth.CertificateChainPayload;
 import org.cloudburstmc.protocol.bedrock.packet.LoginPacket;
 import org.cloudburstmc.protocol.bedrock.packet.ServerToClientHandshakePacket;
 import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult;
 import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult.IdentityData;
 import org.cloudburstmc.protocol.bedrock.util.EncryptionUtils;
-import org.geysermc.cumulus.form.CustomForm;
 import org.geysermc.cumulus.form.ModalForm;
 import org.geysermc.cumulus.form.SimpleForm;
 import org.geysermc.cumulus.response.SimpleFormResponse;
 import org.geysermc.cumulus.response.result.FormResponseResult;
 import org.geysermc.cumulus.response.result.ValidFormResponseResult;
 import org.geysermc.geyser.GeyserImpl;
-import org.geysermc.geyser.configuration.GeyserConfiguration;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.session.auth.AuthData;
 import org.geysermc.geyser.session.auth.BedrockClientData;
@@ -60,14 +60,14 @@ public class LoginEncryptionUtils {
     private static boolean HAS_SENT_ENCRYPTION_MESSAGE = false;
 
     public static void encryptPlayerConnection(GeyserSession session, LoginPacket loginPacket) {
-        encryptConnectionWithCert(session, loginPacket.getExtra(), loginPacket.getChain());
+        encryptConnectionWithCert(session, loginPacket.getAuthPayload(), loginPacket.getClientJwt());
     }
 
-    private static void encryptConnectionWithCert(GeyserSession session, String clientData, List<String> certChainData) {
+    private static void encryptConnectionWithCert(GeyserSession session, AuthPayload authPayload, String jwt) {
         try {
             GeyserImpl geyser = session.getGeyser();
 
-            ChainValidationResult result = EncryptionUtils.validateChain(certChainData);
+            ChainValidationResult result = EncryptionUtils.validatePayload(authPayload);
 
             geyser.getLogger().debug(String.format("Is player data signed? %s", result.signed()));
 
@@ -77,19 +77,25 @@ public class LoginEncryptionUtils {
             }
 
             IdentityData extraData = result.identityClaims().extraData;
-            session.setAuthenticationData(new AuthData(extraData.displayName, extraData.identity, extraData.xuid));
-            session.setCertChainData(certChainData);
+            // TODO!!! identity won't persist
+            session.setAuthData(new AuthData(extraData.displayName, extraData.identity, extraData.xuid));
+            if (authPayload instanceof CertificateChainPayload certificateChainPayload) {
+                session.setCertChainData(certificateChainPayload.getChain());
+            } else {
+                GeyserImpl.getInstance().getLogger().warning("Received new auth payload!");
+                session.setCertChainData(List.of());
+            }
 
             PublicKey identityPublicKey = result.identityClaims().parsedIdentityPublicKey();
 
-            byte[] clientDataPayload = EncryptionUtils.verifyClientData(clientData, identityPublicKey);
+            byte[] clientDataPayload = EncryptionUtils.verifyClientData(jwt, identityPublicKey);
             if (clientDataPayload == null) {
                 throw new IllegalStateException("Client data isn't signed by the given chain data");
             }
 
             JsonNode clientDataJson = JSON_MAPPER.readTree(clientDataPayload);
             BedrockClientData data = JSON_MAPPER.convertValue(clientDataJson, BedrockClientData.class);
-            data.setOriginalString(clientData);
+            data.setOriginalString(jwt);
             session.setClientData(data);
 
             try {
@@ -137,26 +143,16 @@ public class LoginEncryptionUtils {
         // Set DoDaylightCycle to false so the time doesn't accelerate while we're here
         session.setDaylightCycle(false);
 
-        GeyserConfiguration config = session.getGeyser().getConfig();
-        boolean isPasswordAuthEnabled = config.getRemote().isPasswordAuthentication();
-
         session.sendForm(
                 SimpleForm.builder()
                         .translator(GeyserLocale::getPlayerLocaleString, session.locale())
                         .title("geyser.auth.login.form.notice.title")
                         .content("geyser.auth.login.form.notice.desc")
-                        .optionalButton("geyser.auth.login.form.notice.btn_login.mojang", isPasswordAuthEnabled)
                         .button("geyser.auth.login.form.notice.btn_login.microsoft")
                         .button("geyser.auth.login.form.notice.btn_disconnect")
                         .closedOrInvalidResultHandler(() -> buildAndShowLoginWindow(session))
                         .validResultHandler((response) -> {
                             if (response.clickedButtonId() == 0) {
-                                session.setMicrosoftAccount(false);
-                                buildAndShowLoginDetailsWindow(session);
-                                return;
-                            }
-
-                            if (response.clickedButtonId() == 1) {
                                 session.authenticateWithMicrosoftCode();
                                 return;
                             }
@@ -212,23 +208,10 @@ public class LoginEncryptionUtils {
         };
     }
 
-    public static void buildAndShowLoginDetailsWindow(GeyserSession session) {
-        session.sendForm(
-                CustomForm.builder()
-                        .translator(GeyserLocale::getPlayerLocaleString, session.locale())
-                        .title("geyser.auth.login.form.details.title")
-                        .label("geyser.auth.login.form.details.desc")
-                        .input("geyser.auth.login.form.details.email", "account@geysermc.org", "")
-                        .input("geyser.auth.login.form.details.pass", "123456", "")
-                        .invalidResultHandler(() -> buildAndShowLoginDetailsWindow(session))
-                        .closedResultHandler(() -> buildAndShowLoginWindow(session))
-                        .validResultHandler((response) -> session.authenticate(response.next(), response.next())));
-    }
-
     /**
      * Shows the code that a user must input into their browser
      */
-    public static void buildAndShowMicrosoftCodeWindow(GeyserSession session, MsaAuthenticationService.MsCodeResponse msCode) {
+    public static void buildAndShowMicrosoftCodeWindow(GeyserSession session, StepMsaDeviceCode.MsaDeviceCode msCode) {
         String locale = session.locale();
 
         StringBuilder message = new StringBuilder("%xbox.signin.website\n")
@@ -237,7 +220,7 @@ public class LoginEncryptionUtils {
                 .append(ChatColor.RESET)
                 .append("\n%xbox.signin.enterCode\n")
                 .append(ChatColor.GREEN)
-                .append(msCode.user_code);
+                .append(msCode.getUserCode());
         int timeout = session.getGeyser().getConfig().getPendingAuthenticationTimeout();
         if (timeout != 0) {
             message.append("\n\n")

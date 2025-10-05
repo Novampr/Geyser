@@ -25,12 +25,9 @@
 
 package org.geysermc.geyser.entity.type.living;
 
-import com.github.steveice10.mc.protocol.data.game.entity.metadata.EntityMetadata;
-import com.github.steveice10.mc.protocol.data.game.entity.metadata.type.BooleanEntityMetadata;
-import com.github.steveice10.mc.protocol.data.game.entity.metadata.type.ByteEntityMetadata;
-import com.github.steveice10.mc.protocol.data.game.entity.player.Hand;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.cloudburstmc.math.vector.Vector3f;
 import org.cloudburstmc.protocol.bedrock.data.entity.EntityDataType;
 import org.cloudburstmc.protocol.bedrock.data.entity.EntityDataTypes;
@@ -39,10 +36,16 @@ import org.cloudburstmc.protocol.bedrock.data.inventory.ItemData;
 import org.geysermc.geyser.entity.EntityDefinition;
 import org.geysermc.geyser.entity.EntityDefinitions;
 import org.geysermc.geyser.entity.type.LivingEntity;
+import org.geysermc.geyser.inventory.GeyserItemStack;
 import org.geysermc.geyser.item.Items;
+import org.geysermc.geyser.scoreboard.Team;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.util.InteractionResult;
 import org.geysermc.geyser.util.MathUtils;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.EntityMetadata;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.BooleanEntityMetadata;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.ByteEntityMetadata;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.player.Hand;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -70,7 +73,7 @@ public class ArmorStandEntity extends LivingEntity {
     private boolean primaryEntity = true;
     /**
      * Whether the entity's position must be updated to included the offset.
-     *
+     * <p>
      * This should be true when the Java server marks the armor stand as invisible, but we shrink the entity
      * to allow the nametag to appear. Basically:
      * - Is visible: this is irrelevant (false)
@@ -99,11 +102,11 @@ public class ArmorStandEntity extends LivingEntity {
     }
 
     @Override
-    public boolean despawnEntity() {
+    public void despawnEntity() {
         if (secondEntity != null) {
             secondEntity.despawnEntity();
         }
-        return super.despawnEntity();
+        super.despawnEntity();
     }
 
     @Override
@@ -120,6 +123,12 @@ public class ArmorStandEntity extends LivingEntity {
         float yOffset = getYOffset();
         super.moveAbsolute(yOffset != 0 ? position.up(yOffset) : position , yaw, yaw, yaw, isOnGround, teleported);
         this.position = position;
+    }
+
+    @Override
+    public void updateNametag(@Nullable Team team) {
+        // unlike all other LivingEntities, armor stands are not affected by team nametag visibility
+        super.updateNametag(team, true);
     }
 
     @Override
@@ -207,7 +216,7 @@ public class ArmorStandEntity extends LivingEntity {
      * @param negativeZToggle the flag to set true if the Z value of rotation is negative
      * @param rotation the Java rotation value
      */
-    private void onRotationUpdate(EntityDataType dataLeech, EntityFlag negativeXToggle, EntityFlag negativeYToggle, EntityFlag negativeZToggle, Vector3f rotation) {
+    private void onRotationUpdate(EntityDataType<Integer> dataLeech, EntityFlag negativeXToggle, EntityFlag negativeYToggle, EntityFlag negativeZToggle, Vector3f rotation) {
         // Indicate that rotation should be checked
         setFlag(EntityFlag.BRIBED, true);
 
@@ -249,7 +258,7 @@ public class ArmorStandEntity extends LivingEntity {
     @Override
     public InteractionResult interactAt(Hand hand) {
         if (!isMarker && session.getPlayerInventory().getItemInHand(hand).asItem() != Items.NAME_TAG) {
-            // Java Edition returns SUCCESS if in spectator mode, but this is overrided with an earlier check on the client
+            // Java Edition returns SUCCESS if in spectator mode, but this is overridden with an earlier check on the client
             return InteractionResult.CONSUME;
         } else {
             return InteractionResult.PASS;
@@ -257,38 +266,38 @@ public class ArmorStandEntity extends LivingEntity {
     }
 
     @Override
-    public void setHelmet(ItemData helmet) {
+    public void setHelmet(GeyserItemStack helmet) {
         super.setHelmet(helmet);
         updateSecondEntityStatus(true);
     }
 
     @Override
-    public void setChestplate(ItemData chestplate) {
+    public void setChestplate(GeyserItemStack chestplate) {
         super.setChestplate(chestplate);
         updateSecondEntityStatus(true);
     }
 
     @Override
-    public void setLeggings(ItemData leggings) {
+    public void setLeggings(GeyserItemStack leggings) {
         super.setLeggings(leggings);
         updateSecondEntityStatus(true);
     }
 
     @Override
-    public void setBoots(ItemData boots) {
+    public void setBoots(GeyserItemStack boots) {
         super.setBoots(boots);
         updateSecondEntityStatus(true);
     }
 
     @Override
-    public void setHand(ItemData hand) {
+    public void setHand(GeyserItemStack hand) {
         super.setHand(hand);
         updateSecondEntityStatus(true);
     }
 
     @Override
-    public void setOffHand(ItemData offHand) {
-        super.setOffHand(offHand);
+    public void setOffhand(GeyserItemStack offHand) {
+        super.setOffhand(offHand);
         updateSecondEntityStatus(true);
     }
 
@@ -310,7 +319,7 @@ public class ArmorStandEntity extends LivingEntity {
         if (!isInvisible) {
             // The armor stand isn't invisible. We good.
             setFlag(EntityFlag.INVISIBLE, false);
-            dirtyMetadata.put(EntityDataTypes.SCALE, getScale());
+            setScale(getScale());
             updateOffsetRequirement(false);
 
             if (secondEntity != null) {
@@ -324,9 +333,9 @@ public class ArmorStandEntity extends LivingEntity {
         }
         boolean isNametagEmpty = nametag.isEmpty();
         if (!isNametagEmpty && (!helmet.equals(ItemData.AIR) || !chestplate.equals(ItemData.AIR) || !leggings.equals(ItemData.AIR)
-                || !boots.equals(ItemData.AIR) || !hand.equals(ItemData.AIR) || !offHand.equals(ItemData.AIR))) {
+                || !boots.equals(ItemData.AIR) || !hand.equals(ItemData.AIR) || !offhand.equals(ItemData.AIR))) {
             // Reset scale of the proper armor stand
-            this.dirtyMetadata.put(EntityDataTypes.SCALE, getScale());
+            setScale(getScale());
             // Set the proper armor stand to invisible to show armor
             setFlag(EntityFlag.INVISIBLE, true);
             // Update the position of the armor stand
@@ -349,7 +358,7 @@ public class ArmorStandEntity extends LivingEntity {
             // Guarantee this copy is NOT invisible
             secondEntity.setFlag(EntityFlag.INVISIBLE, false);
             // Scale to 0 to show nametag
-            secondEntity.getDirtyMetadata().put(EntityDataTypes.SCALE, 0.0f);
+            secondEntity.setScale(0f);
             // No bounding box as we don't want to interact with this entity
             secondEntity.getDirtyMetadata().put(EntityDataTypes.WIDTH, 0.0f);
             secondEntity.getDirtyMetadata().put(EntityDataTypes.HEIGHT, 0.0f);
@@ -359,7 +368,7 @@ public class ArmorStandEntity extends LivingEntity {
         } else if (isNametagEmpty) {
             // We can just make an invisible entity
             // Reset scale of the proper armor stand
-            dirtyMetadata.put(EntityDataTypes.SCALE, getScale());
+            setScale(getScale());
             // Set the proper armor stand to invisible to show armor
             setFlag(EntityFlag.INVISIBLE, true);
             // Update offset
@@ -373,7 +382,7 @@ public class ArmorStandEntity extends LivingEntity {
             // Nametag is not empty and there is no armor
             // We don't need to make a new entity
             setFlag(EntityFlag.INVISIBLE, false);
-            dirtyMetadata.put(EntityDataTypes.SCALE, 0.0f);
+            setScale(0f);
             // As the above is applied, we need an offset
             updateOffsetRequirement(!isMarker);
 

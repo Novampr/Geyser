@@ -1,33 +1,5 @@
 plugins {
-    `java-library`
-    id("geyser.build-logic")
-    id("io.freefair.lombok") version "6.3.0" apply false
-}
-
-allprojects {
-    group = "org.geysermc.geyser"
-    version = "2.1.2-SNAPSHOT"
-    description = "Allows for players from Minecraft: Bedrock Edition to join Minecraft: Java Edition servers."
-}
-
-val platforms = setOf(
-    projects.fabric,
-    projects.bungeecord,
-    projects.spigot,
-    projects.sponge,
-    projects.standalone,
-    projects.velocity
-).map { it.dependencyProject }
-
-subprojects {
-    apply {
-        plugin("java-library")
-        plugin("io.freefair.lombok")
-        plugin("geyser.build-logic")
-    }
-
-    when (this) {
-        in platforms -> plugins.apply("geyser.platform-conventions")
-        else -> plugins.apply("geyser.base-conventions")
-    }
+    // Ensure AP works in eclipse (no effect on other IDEs)
+    eclipse
+    id("geyser.base-conventions")
 }

@@ -34,12 +34,13 @@ public final class Constants {
     public static final String NEWS_OVERVIEW_URL = "https://api.geysermc.org/v2/news/";
     public static final String NEWS_PROJECT_NAME = "geyser";
 
-    public static final String FLOODGATE_DOWNLOAD_LOCATION = "https://ci.opencollab.dev/job/GeyserMC/job/Floodgate/job/master/";
+    public static final String FLOODGATE_DOWNLOAD_LOCATION = "https://geysermc.org/download#floodgate";
+    public static final String GEYSER_DOWNLOAD_LOCATION = "https://geysermc.org/download";
+    static final String SAVED_AUTH_CHAINS_FILE = "saved-auth-chains.json";
 
-    public static final String GEYSER_DOWNLOAD_LOCATION = "https://ci.geysermc.org";
-    public static final String UPDATE_PERMISSION = "geyser.update";
+    public static final String GEYSER_CUSTOM_NAMESPACE = "geyser_custom";
 
-    static final String SAVED_REFRESH_TOKEN_FILE = "saved-refresh-tokens.json";
+    public static final String MINECRAFT_SKIN_SERVER_URL = "https://textures.minecraft.net/texture/";
 
     static {
         URI wsUri = null;

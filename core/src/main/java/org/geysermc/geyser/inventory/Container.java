@@ -25,20 +25,20 @@
 
 package org.geysermc.geyser.inventory;
 
-import com.github.steveice10.mc.protocol.data.game.inventory.ContainerType;
 import lombok.Getter;
+import org.checkerframework.checker.nullness.qual.NonNull;
+import org.geysermc.geyser.level.block.type.Block;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.translator.inventory.InventoryTranslator;
+import org.geysermc.mcprotocollib.protocol.data.game.inventory.ContainerType;
 import org.jetbrains.annotations.Range;
-
-import javax.annotation.Nonnull;
 
 /**
  * Combination of {@link Inventory} and {@link PlayerInventory}
  */
 @Getter
 public class Container extends Inventory {
-    private final PlayerInventory playerInventory;
+    protected final PlayerInventory playerInventory;
     private final int containerSize;
 
     /**
@@ -46,9 +46,9 @@ public class Container extends Inventory {
      */
     private boolean isUsingRealBlock = false;
 
-    public Container(String title, int id, int size, ContainerType containerType, PlayerInventory playerInventory) {
-        super(title, id, size, containerType);
-        this.playerInventory = playerInventory;
+    public Container(GeyserSession session, String title, int id, int size, ContainerType containerType) {
+        super(session, title, id, size, containerType);
+        this.playerInventory = session.getPlayerInventory();
         this.containerSize = this.size + InventoryTranslator.PLAYER_INVENTORY_SIZE;
     }
 
@@ -67,7 +67,7 @@ public class Container extends Inventory {
     }
 
     @Override
-    public void setItem(int slot, @Nonnull GeyserItemStack newItem, GeyserSession session) {
+    public void setItem(int slot, @NonNull GeyserItemStack newItem, GeyserSession session) {
         if (slot < this.size) {
             super.setItem(slot, newItem, session);
         } else {
@@ -84,9 +84,9 @@ public class Container extends Inventory {
      * Will be overwritten for droppers.
      *
      * @param usingRealBlock whether this container is using a real container or not
-     * @param javaBlockId the Java block string of the block, if real
+     * @param block the Java block, if real
      */
-    public void setUsingRealBlock(boolean usingRealBlock, String javaBlockId) {
+    public void setUsingRealBlock(boolean usingRealBlock, Block block) {
         isUsingRealBlock = usingRealBlock;
     }
 }

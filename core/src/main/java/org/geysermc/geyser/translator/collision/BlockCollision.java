@@ -25,10 +25,10 @@
 
 package org.geysermc.geyser.translator.collision;
 
-import org.cloudburstmc.math.vector.Vector3d;
-import org.cloudburstmc.math.vector.Vector3i;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.cloudburstmc.math.vector.Vector3d;
+import org.cloudburstmc.math.vector.Vector3i;
 import org.geysermc.geyser.level.physics.Axis;
 import org.geysermc.geyser.level.physics.BoundingBox;
 import org.geysermc.geyser.level.physics.CollisionManager;
@@ -54,14 +54,14 @@ public class BlockCollision {
     /**
      * This is used to control the maximum distance a face of a bounding box can push the player away
      */
-    protected double pushAwayTolerance = CollisionManager.COLLISION_TOLERANCE * 1.1;
+    protected final double pushAwayTolerance = CollisionManager.COLLISION_TOLERANCE * 1.1;
 
     protected BlockCollision(BoundingBox[] boxes) {
         this.boundingBoxes = boxes;
     }
 
     /**
-     * Overridden in classes like SnowCollision and GrassPathCollision when correction code needs to be run before the
+     * Overridden in classes like GrassPathCollision when correction code needs to be run before the
      * main correction
      */
     public void beforeCorrectPosition(int x, int y, int z, BoundingBox playerCollision) {}
@@ -165,5 +165,23 @@ public class BlockCollision {
             }
         }
         return offset;
+    }
+
+    /**
+     * Checks if this block collision is below the given bounding box.
+     *
+     * @param blockY the y position of the block in the world
+     * @param boundingBox the bounding box to compare
+     * @return true if this block collision is below the bounding box
+     */
+    public boolean isBelow(int blockY, BoundingBox boundingBox) {
+        double minY = boundingBox.getMiddleY() - boundingBox.getSizeY() / 2;
+        for (BoundingBox b : boundingBoxes) {
+            double offset = blockY + b.getMiddleY() + b.getSizeY() / 2 - minY;
+            if (offset > CollisionManager.COLLISION_TOLERANCE) {
+                return false;
+            }
+        }
+        return true;
     }
 }

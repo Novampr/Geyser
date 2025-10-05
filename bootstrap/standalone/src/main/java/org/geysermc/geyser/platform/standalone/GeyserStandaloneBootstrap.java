@@ -32,16 +32,15 @@ import com.fasterxml.jackson.databind.introspect.AnnotatedField;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
 import io.netty.util.ResourceLeakDetector;
 import lombok.Getter;
-import net.minecrell.terminalconsole.TerminalConsoleAppender;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Appender;
 import org.apache.logging.log4j.core.Logger;
-import org.apache.logging.log4j.core.appender.ConsoleAppender;
-import org.geysermc.geyser.api.util.PlatformType;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.geysermc.geyser.GeyserBootstrap;
 import org.geysermc.geyser.GeyserImpl;
-import org.geysermc.geyser.command.GeyserCommandManager;
+import org.geysermc.geyser.api.util.PlatformType;
+import org.geysermc.geyser.command.CommandRegistry;
+import org.geysermc.geyser.command.standalone.StandaloneCloudCommandManager;
 import org.geysermc.geyser.configuration.GeyserConfiguration;
 import org.geysermc.geyser.configuration.GeyserJacksonConfiguration;
 import org.geysermc.geyser.dump.BootstrapDumpInfo;
@@ -51,7 +50,6 @@ import org.geysermc.geyser.platform.standalone.gui.GeyserStandaloneGUI;
 import org.geysermc.geyser.text.GeyserLocale;
 import org.geysermc.geyser.util.FileUtils;
 import org.geysermc.geyser.util.LoopbackUtil;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,20 +57,25 @@ import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class GeyserStandaloneBootstrap implements GeyserBootstrap {
 
-    private GeyserCommandManager geyserCommandManager;
+    private StandaloneCloudCommandManager cloud;
+    private CommandRegistry commandRegistry;
     private GeyserStandaloneConfiguration geyserConfig;
-    private GeyserStandaloneLogger geyserLogger;
+    private final GeyserStandaloneLogger geyserLogger = new GeyserStandaloneLogger();
     private IGeyserPingPassthrough geyserPingPassthrough;
-
     private GeyserStandaloneGUI gui;
-
     @Getter
     private boolean useGui = System.console() == null && !isHeadless();
+    private Logger log4jLogger;
     private String configFilename = "config.yml";
 
     private GeyserImpl geyser;
@@ -85,6 +88,14 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
         if (System.getProperty("io.netty.leakDetection.level") == null) {
             ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED); // Can eat performance
         }
+
+        // Restore allocator used before Netty 4.2 due to oom issues with the adaptive allocator
+        if (System.getProperty("io.netty.allocator.type") == null) {
+            System.setProperty("io.netty.allocator.type", "pooled");
+        }
+
+        System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
+        GeyserStandaloneLogger.setupStreams();
 
         GeyserStandaloneBootstrap bootstrap = new GeyserStandaloneBootstrap();
         // Set defaults
@@ -161,39 +172,31 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
                 }
             }
         }
-        bootstrap.onEnable(useGuiOpts, configFilenameOpt);
-    }
-
-    public void onEnable(boolean useGui, String configFilename) {
-        this.configFilename = configFilename;
-        this.useGui = useGui;
-        this.onEnable();
+        bootstrap.useGui = useGuiOpts;
+        bootstrap.configFilename = configFilenameOpt;
+        bootstrap.onGeyserInitialize();
     }
 
     @Override
-    public void onEnable() {
-        Logger logger = (Logger) LogManager.getRootLogger();
-        for (Appender appender : logger.getAppenders().values()) {
-            // Remove the appender that is not in use
-            // Prevents multiple appenders/double logging and removes harmless errors
-            if ((useGui && appender instanceof TerminalConsoleAppender) || (!useGui && appender instanceof ConsoleAppender)) {
-                logger.removeAppender(appender);
-            }
-        }
-
-        this.geyserLogger = new GeyserStandaloneLogger();
+    public void onGeyserInitialize() {
+        log4jLogger = (Logger) LogManager.getRootLogger();
 
         if (useGui && gui == null) {
             gui = new GeyserStandaloneGUI(geyserLogger);
-            gui.redirectSystemStreams();
+            gui.addGuiAppender();
             gui.startUpdateThread();
         }
 
         LoopbackUtil.checkAndApplyLoopback(geyserLogger);
-        
+
+        this.onGeyserEnable();
+    }
+
+    @Override
+    public void onGeyserEnable() {
         try {
             File configFile = FileUtils.fileOrCopiedFromResource(new File(configFilename), "config.yml",
-                    (x) -> x.replaceAll("generateduuid", UUID.randomUUID().toString()), this);
+                (x) -> x.replaceAll("generateduuid", UUID.randomUUID().toString()), this);
             geyserConfig = FileUtils.loadConfig(configFile, GeyserStandaloneConfiguration.class);
 
             handleArgsConfigOptions();
@@ -215,23 +218,36 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
         GeyserConfiguration.checkGeyserConfiguration(geyserConfig, geyserLogger);
 
         // Allow libraries like Protocol to have their debug information passthrough
-        logger.get().setLevel(geyserConfig.isDebugMode() ? Level.DEBUG : Level.INFO);
+        log4jLogger.get().setLevel(geyserConfig.isDebugMode() ? Level.DEBUG : Level.INFO);
 
         geyser = GeyserImpl.load(PlatformType.STANDALONE, this);
+
+        boolean reloading = geyser.isReloading();
+        if (!reloading) {
+            // Currently there would be no significant benefit of re-initializing commands. Also, we would have to unsubscribe CommandRegistry.
+            // Fire GeyserDefineCommandsEvent after PreInitEvent, before PostInitEvent, for consistency with other bootstraps.
+            cloud = new StandaloneCloudCommandManager(geyser);
+            commandRegistry = new CommandRegistry(geyser, cloud);
+        }
+
         GeyserImpl.start();
 
-        geyserCommandManager = new GeyserCommandManager(geyser);
-        geyserCommandManager.init();
+        if (!reloading) {
+            // Event must be fired after CommandRegistry has subscribed its listener.
+            // Also, the subscription for the Permissions class is created when Geyser is initialized.
+            cloud.fireRegisterPermissionsEvent();
+        } else {
+            // This isn't ideal - but geyserLogger#start won't ever finish, leading to a reloading deadlock
+            geyser.setReloading(false);
+        }
 
         if (gui != null) {
-            gui.enableCommands(geyser.getScheduledThread(), geyserCommandManager);
+            gui.enableCommands(geyser.getScheduledThread(), commandRegistry);
         }
 
         geyserPingPassthrough = GeyserLegacyPingPassthrough.init(geyser);
 
-        if (!useGui) {
-            geyserLogger.start(); // Throws an error otherwise
-        }
+        geyserLogger.start();
     }
 
     /**
@@ -244,13 +260,19 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
             Class<?> graphicsEnv = Class.forName("java.awt.GraphicsEnvironment");
             Method isHeadless = graphicsEnv.getDeclaredMethod("isHeadless");
             return (boolean) isHeadless.invoke(null);
-        } catch (Exception ignore) { }
+        } catch (Exception ignore) {
+        }
 
         return true;
     }
 
     @Override
-    public void onDisable() {
+    public void onGeyserDisable() {
+        geyser.disable();
+    }
+
+    @Override
+    public void onGeyserShutdown() {
         geyser.shutdown();
         System.exit(0);
     }
@@ -266,8 +288,8 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
     }
 
     @Override
-    public GeyserCommandManager getGeyserCommandManager() {
-        return geyserCommandManager;
+    public CommandRegistry getCommandRegistry() {
+        return commandRegistry;
     }
 
     @Override
@@ -292,7 +314,7 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
         return new GeyserStandaloneDumpInfo(this);
     }
 
-    @NotNull
+    @NonNull
     @Override
     public String getServerBindAddress() {
         throw new IllegalStateException();
@@ -325,12 +347,12 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
 
         // Get the ignored properties
         Set<String> ignoredProperties = OBJECT_MAPPER.getSerializationConfig().getAnnotationIntrospector()
-                .findPropertyIgnorals(beanDescription.getClassInfo()).getIgnored();
+            .findPropertyIgnoralByName(OBJECT_MAPPER.getSerializationConfig(), beanDescription.getClassInfo()).getIgnored();
 
         // Filter properties removing the ignored ones
         return properties.stream()
-                .filter(property -> !ignoredProperties.contains(property.getName()))
-                .collect(Collectors.toList());
+            .filter(property -> !ignoredProperties.contains(property.getName()))
+            .collect(Collectors.toList());
     }
 
     /**
@@ -340,7 +362,7 @@ public class GeyserStandaloneBootstrap implements GeyserBootstrap {
      * @param parentObject The object to alter
      * @param value The new value of the property
      */
-    @SuppressWarnings("unchecked") // Required for enum usage
+    @SuppressWarnings({"unchecked", "rawtypes"}) // Required for enum usage
     private static void setConfigOption(BeanPropertyDefinition property, Object parentObject, Object value) {
         Object parsedValue = value;
 

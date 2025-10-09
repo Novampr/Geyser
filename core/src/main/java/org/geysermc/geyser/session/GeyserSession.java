@@ -79,31 +79,7 @@ import org.cloudburstmc.protocol.bedrock.data.definitions.DimensionDefinition;
 import org.cloudburstmc.protocol.bedrock.data.entity.EntityFlag;
 import org.cloudburstmc.protocol.bedrock.data.inventory.ItemData;
 import org.cloudburstmc.protocol.bedrock.data.inventory.crafting.recipe.CraftingRecipeData;
-import org.cloudburstmc.protocol.bedrock.packet.AvailableEntityIdentifiersPacket;
-import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
-import org.cloudburstmc.protocol.bedrock.packet.BiomeDefinitionListPacket;
-import org.cloudburstmc.protocol.bedrock.packet.CameraPresetsPacket;
-import org.cloudburstmc.protocol.bedrock.packet.ChunkRadiusUpdatedPacket;
-import org.cloudburstmc.protocol.bedrock.packet.CreativeContentPacket;
-import org.cloudburstmc.protocol.bedrock.packet.DimensionDataPacket;
-import org.cloudburstmc.protocol.bedrock.packet.EmoteListPacket;
-import org.cloudburstmc.protocol.bedrock.packet.GameRulesChangedPacket;
-import org.cloudburstmc.protocol.bedrock.packet.ItemComponentPacket;
-import org.cloudburstmc.protocol.bedrock.packet.LevelEventPacket;
-import org.cloudburstmc.protocol.bedrock.packet.LevelSoundEventPacket;
-import org.cloudburstmc.protocol.bedrock.packet.PlayStatusPacket;
-import org.cloudburstmc.protocol.bedrock.packet.SetCommandsEnabledPacket;
-import org.cloudburstmc.protocol.bedrock.packet.SetEntityMotionPacket;
-import org.cloudburstmc.protocol.bedrock.packet.SetTimePacket;
-import org.cloudburstmc.protocol.bedrock.packet.StartGamePacket;
-import org.cloudburstmc.protocol.bedrock.packet.SyncEntityPropertyPacket;
-import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
-import org.cloudburstmc.protocol.bedrock.packet.TransferPacket;
-import org.cloudburstmc.protocol.bedrock.packet.UpdateAbilitiesPacket;
-import org.cloudburstmc.protocol.bedrock.packet.UpdateAdventureSettingsPacket;
-import org.cloudburstmc.protocol.bedrock.packet.UpdateAttributesPacket;
-import org.cloudburstmc.protocol.bedrock.packet.UpdateClientInputLocksPacket;
-import org.cloudburstmc.protocol.bedrock.packet.UpdateSoftEnumPacket;
+import org.cloudburstmc.protocol.bedrock.packet.*;
 import org.cloudburstmc.protocol.common.util.OptionalBoolean;
 import org.geysermc.api.util.BedrockPlatform;
 import org.geysermc.api.util.InputMode;
@@ -1607,6 +1583,14 @@ public class GeyserSession implements GeyserConnection, GeyserCommandSource {
         }
 
         SkinManager.sendSkinPacket(this, entity, skinData);
+    }
+
+    @Override
+    public void showProfile(@NonNull String xuid) {
+        ShowProfilePacket packet = new ShowProfilePacket();
+        packet.setXuid(xuid);
+
+        upstream.sendPacket(packet);
     }
 
     @Override

@@ -167,6 +167,14 @@ public interface GeyserConnection extends Connection, CommandSource {
     void sendSkin(@NonNull UUID player, @NonNull SkinData skinData);
 
     /**
+     * Shows a bedrock player profile from the provided XUID. This can only show
+     * real bedrock player profiles, you find the XUID of a {@link GeyserConnection}
+     * with {@link GeyserConnection#xuid()}
+     * @param xuid the XUID of the player which you are showing the profile of
+     */
+    void showProfile(@NonNull String xuid);
+
+    /**
      * @param javaId the Java entity ID to look up.
      * @return a {@link GeyserEntity} if present in this connection's entity tracker.
      * @deprecated Use {@link EntityData#entityByJavaId(int)} instead

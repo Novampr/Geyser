@@ -23,34 +23,40 @@
  * @link https://github.com/GeyserMC/Geyser
  */
 
-package org.geysermc.geyser.api.network;
+package org.geysermc.geyser.network;
 
+import org.checkerframework.checker.index.qual.NonNegative;
 import org.checkerframework.checker.nullness.qual.NonNull;
-import org.geysermc.geyser.api.extension.Extension;
 import org.geysermc.geyser.api.util.Identifier;
 
 import java.util.Objects;
 
 /**
- * Represents a network channel associated with an extension.
- * @since 2.8.2
+ * Represents a network channel associated with a packet.
+ * <p>
+ * This channel is used for listening to communication over
+ * packets between the server and client and can be used to
+ * send or receive packets.
  */
-public class ExtensionNetworkChannel implements NetworkChannel {
-    private final Extension extension;
-    private final String channel;
+public class PacketChannel extends ExternalNetworkChannel {
+    private static final String PACKET_CHANNEL_KEY = "packet";
 
-    protected ExtensionNetworkChannel(@NonNull Extension extension, @NonNull String channel) {
-        this.extension = extension;
-        this.channel = channel;
+    private final int packetId;
+
+    public PacketChannel(@NonNull String key, @NonNegative int packetId, @NonNull Class<?> packetType) {
+        super(Identifier.of(PACKET_CHANNEL_KEY, key), packetType);
+
+        this.packetId = packetId;
     }
 
     /**
-     * {@inheritDoc}
+     * Gets the packet ID associated with this channel.
+     *
+     * @return the packet ID
      */
-    @Override
-    @NonNull
-    public Identifier identifier() {
-        return Identifier.of(this.extension.description().id(), this.channel);
+    @NonNegative
+    public int packetId() {
+        return this.packetId;
     }
 
     /**
@@ -58,26 +64,19 @@ public class ExtensionNetworkChannel implements NetworkChannel {
      */
     @Override
     public boolean isPacket() {
-        return false;
+        return true;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (o == null || !NetworkChannel.class.isAssignableFrom(o.getClass())) return false;
-        NetworkChannel that = (NetworkChannel) o;
-        return Objects.equals(this.identifier(), that.identifier());
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        PacketChannel that = (PacketChannel) o;
+        return this.packetId == that.packetId;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.identifier());
-    }
-
-    @Override
-    public String toString() {
-        return "ExtensionNetworkChannel{" +
-                "extension=" + this.extension.description().id() +
-                ", channel='" + this.channel + '\'' +
-                '}';
+        return Objects.hash(super.hashCode(), this.packetId);
     }
 }

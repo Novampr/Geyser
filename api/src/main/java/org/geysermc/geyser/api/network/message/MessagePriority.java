@@ -23,59 +23,48 @@
  * @link https://github.com/GeyserMC/Geyser
  */
 
-package org.geysermc.geyser.api.network;
+package org.geysermc.geyser.api.network.message;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
-import org.geysermc.geyser.api.util.Identifier;
-
-import java.util.Objects;
 
 /**
- * Represents a network channel not associated with any specific extension.
- * <p>
- * This can be used for external communication channels, like mods or plugins.
- * @since 2.8.2
+ * Represents the priority of a message when being processed.
+ * @since 2.9.1
  */
-public class ExternalNetworkChannel implements NetworkChannel {
-    private final Identifier identifier;
+public enum MessagePriority {
+    FIRST(100),
+    EARLY(50),
+    NORMAL(0),
+    LATE(-50),
+    LAST(-100);
 
-    protected ExternalNetworkChannel(@NonNull Identifier identifier) {
-        this.identifier = identifier;
+    private final int value;
+
+    MessagePriority(int value) {
+        this.value = value;
     }
 
     /**
-     * {@inheritDoc}
+     * Gets the numeric value associated with this priority. Higher means earlier.
+     *
+     * @return the priority value
      */
-    @Override
+    public int value() {
+        return value;
+    }
+
+    /**
+     * Creates a custom priority in the range [-100, 100].
+     *
+     * @param value the priority value
+     * @return the priority
+     */
     @NonNull
-    public Identifier identifier() {
-        return this.identifier;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean isPacket() {
-        return false;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || !NetworkChannel.class.isAssignableFrom(o.getClass())) return false;
-        NetworkChannel that = (NetworkChannel) o;
-        return Objects.equals(this.identifier(), that.identifier());
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(this.identifier());
-    }
-
-    @Override
-    public String toString() {
-        return "ExternalNetworkChannel{" +
-                "identifier='" + this.identifier + '\'' +
-                '}';
+    public static MessagePriority of(int value) {
+        if (value >= 75) return FIRST;
+        if (value >= 25) return EARLY;
+        if (value <= -75) return LAST;
+        if (value <= -25) return LATE;
+        return NORMAL;
     }
 }

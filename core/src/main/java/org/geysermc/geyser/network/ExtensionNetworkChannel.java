@@ -23,53 +23,35 @@
  * @link https://github.com/GeyserMC/Geyser
  */
 
-package org.geysermc.geyser.api.network;
+package org.geysermc.geyser.network;
 
-import org.checkerframework.checker.index.qual.NonNegative;
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.geysermc.geyser.api.extension.Extension;
 import org.geysermc.geyser.api.util.Identifier;
 
 import java.util.Objects;
 
 /**
- * Represents a network channel associated with a packet.
- * <p>
- * This channel is used for listening to communication over
- * packets between the server and client and can be used to
- * send or receive packets.
- * @since 2.8.2
+ * Represents a network channel associated with an extension.
  */
-public class PacketChannel extends ExternalNetworkChannel {
-    private static final String PACKET_CHANNEL_KEY = "packet";
+public class ExtensionNetworkChannel extends BaseNetworkChannel {
+    private final Extension extension;
+    private final String channel;
 
-    private final int packetId;
-    private final Class<?> packetType;
+    public ExtensionNetworkChannel(@NonNull Extension extension, @NonNull String channel, @NonNull Class<?> messageType) {
+        super(messageType);
 
-    protected PacketChannel(@NonNull String key, @NonNegative int packetId, @NonNull Class<?> packetType) {
-        super(Identifier.of(PACKET_CHANNEL_KEY, key));
-
-        this.packetId = packetId;
-        this.packetType = packetType;
+        this.extension = extension;
+        this.channel = channel;
     }
 
     /**
-     * Gets the packet ID associated with this channel.
-     *
-     * @return the packet ID
+     * {@inheritDoc}
      */
-    @NonNegative
-    public int packetId() {
-        return this.packetId;
-    }
-
-    /**
-     * Gets the type of the packet associated with this channel.
-     *
-     * @return the class of the packet type
-     */
+    @Override
     @NonNull
-    public Class<?> packetType() {
-        return this.packetType;
+    public Identifier identifier() {
+        return Identifier.of(this.extension.description().id(), this.channel);
     }
 
     /**
@@ -77,19 +59,27 @@ public class PacketChannel extends ExternalNetworkChannel {
      */
     @Override
     public boolean isPacket() {
-        return true;
+        return false;
     }
 
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        PacketChannel that = (PacketChannel) o;
-        return this.packetId == that.packetId;
+        ExtensionNetworkChannel that = (ExtensionNetworkChannel) o;
+        return Objects.equals(this.extension, that.extension) && Objects.equals(this.channel, that.channel) && Objects.equals(this.messageType(), that.messageType());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), this.packetId);
+        return Objects.hash(this.identifier(), this.messageType());
+    }
+
+    @Override
+    public String toString() {
+        return "ExtensionNetworkChannel{" +
+                "extension=" + this.extension.description().id() +
+                ", channel='" + this.channel + '\'' +
+                ", messageType=" + this.messageType() +
+                '}';
     }
 }

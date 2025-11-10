@@ -23,43 +23,61 @@
  * @link https://github.com/GeyserMC/Geyser
  */
 
-package org.geysermc.geyser.entity.properties.type;
+package org.geysermc.geyser.network;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
-import org.geysermc.geyser.api.entity.property.type.GeyserEnumEntityProperty;
 import org.geysermc.geyser.api.util.Identifier;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
+import java.util.Objects;
 
-public record EnumProperty<E extends Enum<E>>(
-    Identifier identifier,
-    Class<E> enumClass,
-    @NonNull E defaultValue
-) implements AbstractEnumProperty<E>, GeyserEnumEntityProperty<E> {
+/**
+ * Represents a network channel not associated with any specific extension.
+ * <p>
+ * This can be used for external communication channels, like mods or plugins.
+ */
+public class ExternalNetworkChannel extends BaseNetworkChannel {
+    private final Identifier identifier;
 
-    public EnumProperty {
-        validateAllValues(identifier, Arrays.stream(enumClass.getEnumConstants()).map(value -> value.name().toLowerCase(Locale.ROOT)).toList());
+    public ExternalNetworkChannel(@NonNull Identifier identifier, @NonNull Class<?> messageType) {
+        super(messageType);
+
+        this.identifier = identifier;
     }
 
-    public List<E> values() {
-        return List.of(enumClass.getEnumConstants());
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @NonNull
+    public Identifier identifier() {
+        return this.identifier;
     }
 
-    public List<String> allBedrockValues() {
-        return values().stream().map(
-            value -> value.name().toLowerCase(Locale.ROOT)
-        ).toList();
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isPacket() {
+        return false;
     }
 
     @Override
-    public int indexOf(E value) {
-        return value.ordinal();
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        ExternalNetworkChannel that = (ExternalNetworkChannel) o;
+        return Objects.equals(this.identifier, that.identifier) && Objects.equals(this.messageType(), that.messageType());
     }
 
     @Override
-    public int defaultIndex() {
-        return defaultValue.ordinal();
+    public int hashCode() {
+        return Objects.hash(this.identifier(), this.messageType());
+    }
+
+    @Override
+    public String toString() {
+        return "ExternalNetworkChannel{" +
+                "identifier='" + this.identifier + '\'' +
+                ", messageType=" + this.messageType() +
+                '}';
     }
 }

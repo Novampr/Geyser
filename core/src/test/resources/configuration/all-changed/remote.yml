@@ -76,6 +76,9 @@ gameplay:
   # Controls if coordinates are shown to players.
   show-coordinates: false
 
+  # Controls if days played are shown to players.
+  show-days-played: true
+
   # Whether Bedrock players are blocked from performing their scaffolding-style bridging.
   disable-bedrock-scaffolding: true
 

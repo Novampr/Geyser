@@ -54,11 +54,12 @@ public class SettingsUtils {
 
         // Let's store these to avoid issues
         boolean showCoordinates = session.getPreferencesCache().isAllowShowCoordinates();
+        boolean showDaysPlayed = session.getPreferencesCache().isAllowShowDaysPlayed();
         boolean cooldownShown = session.getGeyser().config().gameplay().showCooldown() != CooldownUtils.CooldownType.DISABLED;
         boolean customSkulls = session.getGeyser().config().gameplay().maxVisibleCustomSkulls() != 0;
 
         // Only show the client title if any of the client settings are available
-        boolean showClientSettings = showCoordinates || cooldownShown || customSkulls;
+        boolean showClientSettings = showCoordinates || showDaysPlayed || cooldownShown || customSkulls;
 
         if (showClientSettings) {
             builder.label("geyser.settings.title.client");
@@ -66,6 +67,10 @@ public class SettingsUtils {
             // Client can only see its coordinates if reducedDebugInfo is disabled and coordinates are enabled in geyser config.
             if (showCoordinates) {
                 builder.toggle("%createWorldScreen.showCoordinates", session.getPreferencesCache().isPrefersShowCoordinates());
+            }
+
+            if (showDaysPlayed) {
+                builder.toggle("%createWorldScreen.showDaysPlayed", session.getPreferencesCache().isPrefersShowDaysPlayed());
             }
 
             if (cooldownShown) {
@@ -108,6 +113,15 @@ public class SettingsUtils {
                     if (session.getPreferencesCache().isAllowShowCoordinates()) {
                         session.getPreferencesCache().setPrefersShowCoordinates(response.next());
                         session.getPreferencesCache().updateShowCoordinates();
+                    }
+                }
+
+                if (showDaysPlayed) {
+                    // In theory, a server could update the gamerule while the client is in the settings menu.
+                    // We need to still read the response to update the client's preference, but we don't want to update the gamerule.
+                    if (session.getPreferencesCache().isAllowShowDaysPlayed()) {
+                        session.getPreferencesCache().setPrefersShowDaysPlayed(response.next());
+                        session.getPreferencesCache().updateShowDaysPlayed();
                     }
                 }
 

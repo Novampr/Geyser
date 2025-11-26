@@ -1977,6 +1977,7 @@ public class GeyserSession implements GeyserConnection, GeyserCommandSource {
         reducedDebugInfo = value;
         // Set the showCoordinates data. This is done because updateShowCoordinates() uses this gamerule as a variable.
         preferencesCache.updateShowCoordinates();
+        preferencesCache.updateShowDaysPlayed();
     }
 
     /**

@@ -43,9 +43,21 @@ public class PreferencesCache {
     private boolean prefersShowCoordinates = true;
 
     /**
+     * True if the client prefers being shown their days played, regardless if they're being shown or not.
+     * This will be true everytime the client joins the server because neither the client nor server store the preference permanently.
+     */
+    @Setter
+    private boolean prefersShowDaysPlayed = true;
+
+    /**
      * If the client's preference will be ignored, this will return false.
      */
     private boolean allowShowCoordinates;
+
+    /**
+     * If the client's preference will be ignored, this will return false.
+     */
+    private boolean allowShowDaysPlayed;
 
     /**
      * If the session wants custom skulls to be shown.
@@ -77,6 +89,11 @@ public class PreferencesCache {
     public void updateShowCoordinates() {
         allowShowCoordinates = !session.isReducedDebugInfo() && session.getGeyser().config().gameplay().showCoordinates();
         session.sendGameRule("showcoordinates", allowShowCoordinates && prefersShowCoordinates);
+    }
+
+    public void updateShowDaysPlayed() {
+        allowShowDaysPlayed = !session.isReducedDebugInfo() && session.getGeyser().config().gameplay().showDaysPlayed();
+        session.sendGameRule("showdaysplayed", allowShowDaysPlayed && prefersShowDaysPlayed);
     }
 
     /**

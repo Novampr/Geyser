@@ -43,10 +43,12 @@ public class JavaSetTimeTranslator extends PacketTranslator<ClientboundSetTimePa
         // https://minecraft.wiki/w/Day-night_cycle#24-hour_Minecraft_day
         SetTimePacket setTimePacket = new SetTimePacket();
         // We use modulus to prevent an integer overflow
-        // 24000 is the range of ticks that a Minecraft day can be; we times by 8 so all moon phases are visible
-        // (Last verified behavior: Bedrock 1.18.12 / Java 1.18.2)
-        setTimePacket.setTime((int) (Math.abs(time) % (24000 * 8)));
+        // This has the unfortunate issue of showing the wrong day count in bedrock
+        // when the day count goes above 89478, however, we can't do much about this
+        // (Last verified behavior: Bedrock 1.21.124 / Java 1.21.10)
+        setTimePacket.setTime((int) (Math.abs(time) % (Integer.MAX_VALUE)));
         session.sendUpstreamPacket(setTimePacket);
+
 
         // We need to send a gamerule if this changed
         if (session.isDaylightCycle() != packet.isTickDayTime()) {

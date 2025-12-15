@@ -31,18 +31,18 @@ import org.geysermc.cumulus.component.DropdownComponent;
 import org.geysermc.geyser.api.connection.GeyserConnection;
 import org.geysermc.geyser.api.preference.Preference;
 import org.geysermc.geyser.api.preference.PreferenceKey;
-import org.geysermc.geyser.configuration.CooldownType;
 import org.geysermc.geyser.session.GeyserSession;
+import org.geysermc.geyser.util.CooldownUtils;
 
 import java.util.Arrays;
 import java.util.List;
 
-public class CooldownPreference extends Preference<CooldownType> {
+public class CooldownPreference extends Preference<CooldownUtils.CooldownType> {
 
-    public static final PreferenceKey<CooldownType> KEY = new PreferenceKey<>("geyser:cooldown_type");
+    public static final PreferenceKey<CooldownUtils.CooldownType> KEY = new PreferenceKey<>("geyser:cooldown_type");
 
-    private static final List<String> OPTIONS = Arrays.stream(CooldownType.VALUES)
-        .map(CooldownType::getTranslation)
+    private static final List<String> OPTIONS = Arrays.stream(CooldownUtils.CooldownType.VALUES)
+        .map(CooldownUtils.CooldownType::getTranslation)
         .toList();
 
     public CooldownPreference(GeyserSession session) {
@@ -51,20 +51,20 @@ public class CooldownPreference extends Preference<CooldownType> {
 
     @Override
     public boolean isModifiable(GeyserConnection connection) {
-        return configSetting((GeyserSession) connection) != CooldownType.DISABLED;
+        return configSetting((GeyserSession) connection) != CooldownUtils.CooldownType.DISABLED;
     }
 
     @Override
     public Component component(GeyserConnection connection) {
-        return DropdownComponent.of(CooldownType.OPTION_DESCRIPTION, OPTIONS, value().ordinal());
+        return DropdownComponent.of(CooldownUtils.CooldownType.OPTION_DESCRIPTION, OPTIONS, value().ordinal());
     }
 
     @Override
     public void onFormResponse(@NonNull Object response) throws IllegalArgumentException {
-        update(CooldownType.VALUES[(int) response]);
+        update(CooldownUtils.CooldownType.VALUES[(int) response]);
     }
 
-    private static CooldownType configSetting(GeyserSession session) {
-        return session.getGeyser().getConfig().getShowCooldown();
+    private static CooldownUtils.CooldownType configSetting(GeyserSession session) {
+        return session.getGeyser().config().gameplay().showCooldown();
     }
 }

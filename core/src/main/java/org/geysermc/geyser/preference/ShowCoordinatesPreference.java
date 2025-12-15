@@ -64,6 +64,6 @@ public class ShowCoordinatesPreference extends BooleanPreference {
     }
 
     private static boolean isAllowed(GeyserSession session) {
-        return !session.isReducedDebugInfo() && session.getGeyser().getConfig().isShowCoordinates();
+        return !session.isReducedDebugInfo() && session.getGeyser().config().gameplay().showCoordinates();
     }
 }

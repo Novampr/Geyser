@@ -25,8 +25,9 @@
 
 package org.geysermc.geyser.util;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.cloudburstmc.protocol.bedrock.packet.SetTitlePacket;
-import org.geysermc.geyser.configuration.CooldownType;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.session.cache.PreferencesCache;
 import org.geysermc.geyser.text.ChatColor;
@@ -38,23 +39,13 @@ import java.util.concurrent.TimeUnit;
  * Much of the work here is from the wonderful folks from <a href="https://github.com/ViaVersion/ViaRewind">ViaRewind</a>
  */
 public class CooldownUtils {
-    private static CooldownType DEFAULT_SHOW_COOLDOWN;
-
-    public static void setDefaultShowCooldown(CooldownType showCooldown) {
-        DEFAULT_SHOW_COOLDOWN = showCooldown;
-    }
-
-    public static CooldownType getDefaultShowCooldown() {
-        return DEFAULT_SHOW_COOLDOWN;
-    }
-
     /**
      * Starts sending the fake cooldown to the Bedrock client. If the cooldown is not disabled, the sent type is the cooldownPreference in {@link PreferencesCache}
      *
      * @param session GeyserSession
      */
     public static void sendCooldown(GeyserSession session) {
-        if (DEFAULT_SHOW_COOLDOWN == CooldownType.DISABLED) return;
+        if (session.getGeyser().config().gameplay().showCooldown() == CooldownType.DISABLED) return;
         CooldownType sessionPreference = session.getPreferencesCache().getEffectiveCooldown();
         if (sessionPreference == CooldownType.DISABLED) return;
 
@@ -154,4 +145,32 @@ public class CooldownUtils {
         return builder.toString();
     }
 
+    @Getter
+    @AllArgsConstructor
+    public enum CooldownType {
+        TITLE("options.attack.crosshair"),
+        ACTIONBAR("options.attack.hotbar"),
+        DISABLED("options.off");
+
+        public static final String OPTION_DESCRIPTION = "options.attackIndicator";
+        public static final CooldownType[] VALUES = values();
+
+        private final String translation;
+
+        /**
+         * Convert the CooldownType string (from config) to the enum, DISABLED on fail
+         *
+         * @param name CooldownType string
+         *
+         * @return The converted CooldownType
+         */
+        public static CooldownType getByName(String name) {
+            for (CooldownType type : VALUES) {
+                if (type.name().equalsIgnoreCase(name)) {
+                    return type;
+                }
+            }
+            return DISABLED;
+        }
+    }
 }

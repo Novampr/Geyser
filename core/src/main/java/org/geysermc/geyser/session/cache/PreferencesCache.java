@@ -30,12 +30,12 @@ import lombok.Getter;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.geysermc.geyser.api.preference.Preference;
 import org.geysermc.geyser.api.preference.PreferenceKey;
-import org.geysermc.geyser.configuration.CooldownType;
-import org.geysermc.geyser.configuration.GeyserConfiguration;
+import org.geysermc.geyser.configuration.GeyserConfig;
 import org.geysermc.geyser.preference.CooldownPreference;
 import org.geysermc.geyser.preference.CustomSkullsPreference;
 import org.geysermc.geyser.preference.ShowCoordinatesPreference;
 import org.geysermc.geyser.session.GeyserSession;
+import org.geysermc.geyser.util.CooldownUtils;
 
 import java.util.Map;
 import java.util.Optional;
@@ -80,10 +80,10 @@ public class PreferencesCache {
     /**
      * Tell the client to hide or show the coordinates.
      * <p>
-     * If {@link #prefersShowCoordinates} is true, coordinates will be shown, unless either of the following conditions apply: <br>
+     * If the client prefers to show coordinates, they will be shown, unless either of the following conditions apply: <br>
      * <br>
      * {@link GeyserSession#isReducedDebugInfo()} is enabled
-     * {@link GeyserConfiguration#isShowCoordinates()} is disabled
+     * {@link GeyserConfig.GameplayConfig#showCoordinates()} is disabled
      */
     public void updateShowCoordinates() {
         Preference<Boolean> preference = require(ShowCoordinatesPreference.KEY);
@@ -93,16 +93,16 @@ public class PreferencesCache {
     }
 
     public boolean getEffectiveShowSkulls() {
-        if (!session.getGeyser().getConfig().isAllowCustomSkulls()) {
+        if (session.getGeyser().config().gameplay().maxVisibleCustomSkulls() == 0) {
             return false;
         }
         return require(CustomSkullsPreference.KEY).value();
     }
 
 
-    public CooldownType getEffectiveCooldown() {
-        if (session.getGeyser().getConfig().getShowCooldown() == CooldownType.DISABLED) {
-            return CooldownType.DISABLED;
+    public CooldownUtils.CooldownType getEffectiveCooldown() {
+        if (session.getGeyser().config().gameplay().showCooldown() == CooldownUtils.CooldownType.DISABLED) {
+            return CooldownUtils.CooldownType.DISABLED;
         }
         return require(CooldownPreference.KEY).value();
     }

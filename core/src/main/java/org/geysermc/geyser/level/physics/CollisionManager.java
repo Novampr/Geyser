@@ -35,7 +35,6 @@ import org.cloudburstmc.math.vector.Vector3f;
 import org.cloudburstmc.math.vector.Vector3i;
 import org.cloudburstmc.protocol.bedrock.data.entity.EntityFlag;
 import org.cloudburstmc.protocol.bedrock.packet.MovePlayerPacket;
-import org.cloudburstmc.protocol.bedrock.packet.UpdateClientInputLocksPacket;
 import org.geysermc.erosion.util.BlockPositionIterator;
 import org.geysermc.geyser.entity.EntityDefinitions;
 import org.geysermc.geyser.entity.type.player.PlayerEntity;
@@ -353,7 +352,7 @@ public class CollisionManager {
         return vector.getX() * vector.getX() + vector.getZ() * vector.getZ();
     }
 
-    private Vector3d correctMovementForCollisions(Vector3d movement, BoundingBox boundingBox, boolean checkWorld, boolean walkOnLava) {
+    public Vector3d correctMovementForCollisions(Vector3d movement, BoundingBox boundingBox, boolean checkWorld, boolean walkOnLava) {
         double movementX = movement.getX();
         double movementY = movement.getY();
         double movementZ = movement.getZ();

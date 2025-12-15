@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022 GeyserMC. http://geysermc.org
+ * Copyright (c) 2025 GeyserMC. http://geysermc.org
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,28 +23,10 @@
  * @link https://github.com/GeyserMC/Geyser
  */
 
-package org.geysermc.geyser.platform.bungeecord;
+package org.geysermc.geyser.session.cache.registry;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.Getter;
-import net.md_5.bungee.api.plugin.Plugin;
-import org.geysermc.geyser.FloodgateKeyLoader;
-import org.geysermc.geyser.configuration.GeyserJacksonConfiguration;
+@FunctionalInterface
+public interface JavaRegistryProvider {
 
-import java.nio.file.Path;
-
-@Getter
-@JsonIgnoreProperties(ignoreUnknown = true)
-public final class GeyserBungeeConfiguration extends GeyserJacksonConfiguration {
-    @JsonIgnore
-    private Path floodgateKeyPath;
-
-    public void loadFloodgate(GeyserBungeePlugin plugin) {
-        Plugin floodgate = plugin.getProxy().getPluginManager().getPlugin("floodgate");
-        Path geyserDataFolder = plugin.getDataFolder().toPath();
-        Path floodgateDataFolder = floodgate != null ? floodgate.getDataFolder().toPath() : null;
-
-        floodgateKeyPath = FloodgateKeyLoader.getKeyPath(this, floodgateDataFolder, geyserDataFolder, plugin.getGeyserLogger());
-    }
+    <T> JavaRegistry<T> registry(JavaRegistryKey<T> registryKey);
 }

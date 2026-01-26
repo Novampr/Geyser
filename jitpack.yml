@@ -2,3 +2,6 @@ jdk:
   - openjdk21
 before_install:
    - echo whyyy
+
+env:
+  ORG_GRADLE_PROJECT_signingRequired: "false"

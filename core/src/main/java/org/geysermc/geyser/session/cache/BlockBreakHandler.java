@@ -59,7 +59,6 @@ import org.geysermc.geyser.translator.item.CustomItemTranslator;
 import org.geysermc.geyser.translator.protocol.bedrock.BedrockInventoryTransactionTranslator;
 import org.geysermc.geyser.translator.protocol.java.level.JavaBlockDestructionTranslator;
 import org.geysermc.geyser.util.BlockUtils;
-import org.geysermc.mcprotocollib.protocol.data.game.entity.player.BlockBreakStage;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.GameMode;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.Hand;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.PlayerAction;
@@ -143,12 +142,22 @@ public class BlockBreakHandler {
     protected @Nullable Vector3i interactPosition = null;
 
     /**
-     * See {@link JavaBlockDestructionTranslator} for usage and explanation
+     * See {@link JavaBlockDestructionTranslator} for usage and explanation.
+     * Expires after access, as a single stage can last a long time without any new packets.
      */
     @Getter
-    private final Cache<Vector3i, DestructionProgress> destructionStageCache = CacheBuilder.newBuilder()
+    private final Cache<Vector3i, JavaBlockDestructionTranslator.DestructionState> destructionStageCache = CacheBuilder.newBuilder()
         .maximumSize(200)
-        .expireAfterWrite(3, TimeUnit.MINUTES)
+        .expireAfterAccess(3, TimeUnit.MINUTES)
+        .build();
+
+    /**
+     * The position each Java breaker entity is currently breaking; see {@link JavaBlockDestructionTranslator}
+     */
+    @Getter
+    private final Cache<Integer, Vector3i> destructionBreakerPositions = CacheBuilder.newBuilder()
+        .maximumSize(200)
+        .expireAfterAccess(3, TimeUnit.MINUTES)
         .build();
 
     /**
@@ -643,9 +652,7 @@ public class BlockBreakHandler {
         clearCurrentVariables();
         this.lastMinedPosition = null;
         this.destructionStageCache.invalidateAll();
-    }
-
-    public record DestructionProgress(long tick, BlockBreakStage stage, double displayedProgress, int rate) {
+        this.destructionBreakerPositions.invalidateAll();
     }
 
     private static class BlockPredicateCache {
